@@ -11,5 +11,4 @@
 
 # Todo
 - Use corpus of plain text files for RAG instead of Strings in the code.
-- Host Ollama on remote machine to expose local LLM instead of Claude.
 - Skibidi Abhi

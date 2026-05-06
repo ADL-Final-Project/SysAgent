@@ -4,7 +4,7 @@ import subprocess
 import sys
 
 from dotenv import load_dotenv
-from langchain_anthropic import ChatAnthropic
+from langchain_ollama import ChatOllama
 from langchain_core.messages import AIMessage, HumanMessage
 from langchain_core.tools import tool
 from langchain.agents import create_agent
@@ -53,7 +53,8 @@ def _validate_service_name(name):
 
 
 @tool
-def check_system_info():
+def check_system_info() -> str:
+    """Return OS version, kernel, hostname, and uptime."""
     lines = [
         "=== Kernel / OS ===",
         _run(["uname", "-a"]),
@@ -66,17 +67,20 @@ def check_system_info():
 
 
 @tool
-def check_disk_usage():
+def check_disk_usage() -> str:
+    """Show disk usage for all mounted filesystems in human-readable form."""
     return _run(["df", "-h", "--output=source,size,used,avail,pcent,target"])
 
 
 @tool
-def check_memory():
+def check_memory() -> str:
+    """Show current RAM and swap usage in human-readable form."""
     return _run(["free", "-h"])
 
 
 @tool
-def list_users():
+def list_users() -> str:
+    """List all non-system users (UID >= 1000) with login name, UID, home, and shell."""
     raw = _run(["getent", "passwd"])
     users = []
     for line in raw.splitlines():
@@ -90,21 +94,40 @@ def list_users():
 
 
 @tool
-def add_user(username):
+def add_user(username: str) -> str:
+    """
+    Create a new Linux user account with a home directory and bash as the default shell.
+
+    Args:
+        username: Login name for the new user (lowercase, digits, underscores, hyphens only).
+    """
     if err := _validate_username(username):
         return err
     return _sudo(["useradd", "--create-home", "--shell", "/bin/bash", username])
 
 
 @tool
-def delete_user(username):
+def delete_user(username: str) -> str:
+    """
+    Delete a Linux user account and remove their home directory.
+
+    Args:
+        username: Login name of the user to delete.
+    """
     if err := _validate_username(username):
         return err
     return _sudo(["userdel", "--remove", username])
 
 
 @tool
-def set_user_password(username, password):
+def set_user_password(username: str, password: str) -> str:
+    """
+    Set the password for an existing Linux user.
+
+    Args:
+        username: Login name of the target user.
+        password: The new plaintext password (passed securely via stdin to chpasswd).
+    """
     if err := _validate_username(username):
         return err
 
@@ -128,7 +151,11 @@ def set_user_password(username, password):
 
 
 @tool
-def update_packages():
+def update_packages() -> str:
+    """
+    Refresh the apt package index and upgrade all installed packages.
+    This may take several minutes depending on the number of pending updates.
+    """
     update_out = _sudo(["apt-get", "update", "-y"], timeout=120)
     upgrade_out = _sudo(["apt-get", "upgrade", "-y",
                         "--with-new-pkgs"], timeout=600)
@@ -136,7 +163,13 @@ def update_packages():
 
 
 @tool
-def list_services(state="active"):
+def list_services(state: str = "active") -> str:
+    """
+    List systemd services filtered by their current state.
+
+    Args:
+        state: Filter — one of 'active', 'failed', or 'all'.
+    """
     allowed_states = {"active", "failed", "all"}
     if state not in allowed_states:
         return f"Invalid state '{state}'. Choose from: {', '.join(sorted(allowed_states))}."
@@ -149,16 +182,23 @@ def list_services(state="active"):
 
 
 @tool
-def manage_service(service_name, action):
+def manage_service(service_name: str, action: str) -> str:
+    """
+    Perform an action on a systemd service.
+
+    Args:
+        service_name: Name of the service, e.g. 'nginx' or 'ssh'.
+        action: One of 'start', 'stop', 'restart', 'status', 'enable', 'disable'.
+    """
     allowed_actions = {"disable", "enable",
                        "restart", "start", "status", "stop"}
-
     if action not in allowed_actions:
         return f"Invalid action '{action}'. Choose from: {', '.join(sorted(allowed_actions))}."
     if err := _validate_service_name(service_name):
         return err
 
     cmd = ["systemctl", action, service_name, "--no-pager"]
+    # 'status' is read-only; all other actions modify state and need privilege.
     return _run(cmd) if action == "status" else _sudo(cmd)
 
 
@@ -190,13 +230,15 @@ SYSTEM_PROMPT = (
 
 
 def build_agent():
-    api_key = os.getenv("ANTHROPIC_API_KEY")
-    if not api_key:
+    ollama_url = os.getenv("OLLAMA_BASE_URL")
+
+    if not ollama_url:
         sys.exit(
-            "Error: ANTHROPIC_API_KEY is not set.\n"
+            "Error: OLLAMA_BASE_URL is not set.\n"
         )
 
-    llm = ChatAnthropic(model="claude-sonnet-4-20250514", temperature=0)
+    llm = ChatOllama(model="llama3.1:8b",
+                     base_url=ollama_url, temperature=0,)
     return create_agent(llm, TOOLS, system_prompt=SYSTEM_PROMPT)
 
 
