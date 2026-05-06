@@ -152,6 +152,7 @@ def list_services(state="active"):
 def manage_service(service_name, action):
     allowed_actions = {"disable", "enable",
                        "restart", "start", "status", "stop"}
+
     if action not in allowed_actions:
         return f"Invalid action '{action}'. Choose from: {', '.join(sorted(allowed_actions))}."
     if err := _validate_service_name(service_name):
@@ -193,7 +194,6 @@ def build_agent():
     if not api_key:
         sys.exit(
             "Error: ANTHROPIC_API_KEY is not set.\n"
-            "Add it to a .env file or export it in your shell and re-run."
         )
 
     llm = ChatAnthropic(model="claude-sonnet-4-20250514", temperature=0)
@@ -220,7 +220,7 @@ if __name__ == "__main__":
     agent = build_agent()
     history = []
 
-    print("Linux Sysadmin Agent — type 'exit' or 'quit' to stop, 'clear' to reset history.\n")
+    print("SysAgent — type 'exit' or 'quit' to stop, 'clear' to reset history.\n")
 
     while True:
         try:
