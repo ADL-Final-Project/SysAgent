@@ -53,7 +53,7 @@ def _validate_service_name(name):
 
 
 @tool
-def check_system_info() -> str:
+def check_system_info():
     """Return OS version, kernel, hostname, and uptime."""
     lines = [
         "=== Kernel / OS ===",
@@ -67,19 +67,19 @@ def check_system_info() -> str:
 
 
 @tool
-def check_disk_usage() -> str:
+def check_disk_usage():
     """Show disk usage for all mounted filesystems in human-readable form."""
     return _run(["df", "-h", "--output=source,size,used,avail,pcent,target"])
 
 
 @tool
-def check_memory() -> str:
+def check_memory():
     """Show current RAM and swap usage in human-readable form."""
     return _run(["free", "-h"])
 
 
 @tool
-def list_users() -> str:
+def list_users():
     """List all non-system users (UID >= 1000) with login name, UID, home, and shell."""
     raw = _run(["getent", "passwd"])
     users = []
@@ -94,7 +94,7 @@ def list_users() -> str:
 
 
 @tool
-def add_user(username: str) -> str:
+def add_user(username):
     """
     Create a new Linux user account with a home directory and bash as the default shell.
 
@@ -107,7 +107,7 @@ def add_user(username: str) -> str:
 
 
 @tool
-def delete_user(username: str) -> str:
+def delete_user(username):
     """
     Delete a Linux user account and remove their home directory.
 
@@ -120,7 +120,7 @@ def delete_user(username: str) -> str:
 
 
 @tool
-def set_user_password(username: str, password: str) -> str:
+def set_user_password(username, password):
     """
     Set the password for an existing Linux user.
 
@@ -151,7 +151,7 @@ def set_user_password(username: str, password: str) -> str:
 
 
 @tool
-def update_packages() -> str:
+def update_packages():
     """
     Refresh the apt package index and upgrade all installed packages.
     This may take several minutes depending on the number of pending updates.
@@ -163,7 +163,7 @@ def update_packages() -> str:
 
 
 @tool
-def list_services(state: str = "active") -> str:
+def list_services(state="active"):
     """
     List systemd services filtered by their current state.
 
@@ -182,7 +182,7 @@ def list_services(state: str = "active") -> str:
 
 
 @tool
-def manage_service(service_name: str, action: str) -> str:
+def manage_service(service_name, action):
     """
     Perform an action on a systemd service.
 
