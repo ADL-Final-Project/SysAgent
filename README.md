@@ -11,4 +11,5 @@
 
 # Todo
 - Use corpus of plain text files for RAG instead of Strings in the code.
+- Get Linux machine to test on that Abhi has access to.
 - Skibidi Abhi
