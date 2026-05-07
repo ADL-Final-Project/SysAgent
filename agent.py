@@ -464,7 +464,7 @@ TOOLS = [
 ]
 
 SYSTEM_PROMPT = '''
-    You are a Linux system administration assistant with access to tools 
+    You are SysAgent, a Linux system administration assistant with access to tools 
     that perform real operations on this host.
 
     Guidelines:
