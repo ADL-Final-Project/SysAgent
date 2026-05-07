@@ -5,8 +5,8 @@ import sys
 
 from dotenv import load_dotenv
 from langchain_ollama import ChatOllama
-from langchain_core.messages import AIMessage, HumanMessage
-from langchain_core.tools import tool
+from langchain.messages import AIMessage, HumanMessage
+from langchain.tools import tool
 from langchain.agents import create_agent
 
 load_dotenv()
@@ -463,27 +463,32 @@ TOOLS = [
     firewall_reset,
 ]
 
-SYSTEM_PROMPT = (
-    "You are a Linux system administration assistant with access to tools "
-    "that perform real operations on this host.\n\n"
-    "Guidelines:\n"
-    "- Always call the appropriate tool rather than guessing at system state.\n"
-    "- Report tool output clearly and concisely; highlight any errors or warnings.\n"
-    "- For multi-step tasks, execute each step in sequence and summarise the outcome.\n"
-    "- If a request is ambiguous or potentially destructive, ask the user to confirm before acting.\n"
-    "- Never fabricate command output."
-)
+SYSTEM_PROMPT = '''
+    You are a Linux system administration assistant with access to tools 
+    that perform real operations on this host.
+
+    Guidelines:
+    - Always call the appropriate tool rather than guessing at system state.
+    - Report tool output clearly and concisely; highlight any errors or warnings.
+    - For multi-step tasks, execute each step in sequence and summarise the outcome.
+    - If a request is ambiguous or potentially destructive, ask the user to confirm before acting.
+    - Never fabricate command output.'''
 
 
 def build_agent():
     ollama_url = os.getenv("OLLAMA_BASE_URL")
+    ollama_model = os.getenv("OLLAMA_MODEL_NAME")
 
     if not ollama_url:
         sys.exit(
             "Error: OLLAMA_BASE_URL is not set.\n"
         )
+    if not ollama_model:
+        sys.exit(
+            "Error: OLLAMA_MODEL_NAME is not set.\n"
+        )
 
-    llm = ChatOllama(model="llama3.1:70b",
+    llm = ChatOllama(model=ollama_model,
                      base_url=ollama_url, temperature=0,)
     return create_agent(llm, TOOLS, system_prompt=SYSTEM_PROMPT)
 
