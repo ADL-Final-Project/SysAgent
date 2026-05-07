@@ -20,7 +20,9 @@ def _run(cmd, timeout=30):
             text=True,
             timeout=timeout,
         )
+
         output = (proc.stdout + proc.stderr).strip()
+
         return output if output else "(command produced no output)"
     except subprocess.TimeoutExpired:
         return f"Error: command timed out after {timeout}s."
@@ -31,6 +33,7 @@ def _run(cmd, timeout=30):
 def _sudo(cmd, timeout=30):
     if os.geteuid() != 0:
         cmd = ["sudo", "--non-interactive"] + cmd
+
     return _run(cmd, timeout=timeout)
 
 
@@ -41,24 +44,28 @@ def _validate_username(username):
             "Must start with a lowercase letter or underscore, "
             "contain only [a-z0-9_-], and be at most 32 characters."
         )
+
     return None
 
 
 def _validate_group_name(group):
     if not re.fullmatch(r"[a-z_][a-z0-9_-]{0,31}", group):
         return f"Invalid group name '{group}'."
+
     return None
 
 
 def _validate_service_name(name):
     if not re.fullmatch(r"[a-zA-Z0-9_@.\-]+", name):
         return f"Invalid service name '{name}'."
+
     return None
 
 
 def _validate_package_name(pkg):
     if not re.fullmatch(r"[a-z0-9][a-z0-9+\-.]+", pkg):
         return f"Invalid package name '{pkg}'."
+
     return None
 
 
@@ -110,12 +117,16 @@ def list_processes(filter=""):
         filter: Case-insensitive substring to grep for (e.g. 'nginx'). Leave blank for all.
     """
     raw = _run(["ps", "aux", "--sort=-%cpu"])
+
     if not filter:
         return raw
+
     header, *rows = raw.splitlines()
     matched = [row for row in rows if filter.lower() in row.lower()]
+
     if not matched:
         return f"No processes matching '{filter}'."
+
     return header + "\n" + "\n".join(matched)
 
 
@@ -130,6 +141,7 @@ def show_logs(service, lines=50):
     """
     if err := _validate_service_name(service):
         return err
+
     return _run(["journalctl", "-u", service, "-n", str(lines), "--no-pager"])
 
 
@@ -143,15 +155,18 @@ def install_packages(packages):
         packages: Space-separated list of package names to install (e.g. 'curl git htop').
     """
     pkg_list = packages.split()
+
     for pkg in pkg_list:
         if err := _validate_package_name(pkg):
             return err
 
     update_out = _sudo(["apt-get", "update", "-y"], timeout=120)
+
     install_out = _sudo(
         ["apt-get", "install", "-y"] + pkg_list,
         timeout=300,
     )
+
     return f"--- apt-get update ---\n{update_out}\n\n--- apt-get install ---\n{install_out}"
 
 
@@ -165,11 +180,13 @@ def remove_packages(packages, purge=False):
         purge:    If True, also delete configuration files (apt-get purge).
     """
     pkg_list = packages.split()
+
     for pkg in pkg_list:
         if err := _validate_package_name(pkg):
             return err
 
     action = "purge" if purge else "remove"
+
     return _sudo(["apt-get", action, "-y"] + pkg_list, timeout=120)
 
 
@@ -182,6 +199,7 @@ def update_packages():
     update_out = _sudo(["apt-get", "update", "-y"], timeout=120)
     upgrade_out = _sudo(["apt-get", "upgrade", "-y",
                         "--with-new-pkgs"], timeout=600)
+
     return f"--- apt-get update ---\n{update_out}\n\n--- apt-get upgrade ---\n{upgrade_out}"
 
 
@@ -190,13 +208,16 @@ def list_users():
     """List all non-system users (UID >= 1000) with login name, UID, home, and shell."""
     raw = _run(["getent", "passwd"])
     users = []
+
     for line in raw.splitlines():
         fields = line.split(":")
+
         if len(fields) >= 7 and fields[2].isdigit() and int(fields[2]) >= 1000:
             users.append(
                 f"  {fields[0]:<20} uid={fields[2]:<6} "
                 f"home={fields[5]:<25} shell={fields[6]}"
             )
+
     return "Non-system users:\n" + "\n".join(users) if users else "No non-system users found."
 
 
@@ -210,6 +231,7 @@ def add_user(username):
     """
     if err := _validate_username(username):
         return err
+
     return _sudo(["useradd", "--create-home", "--shell", "/bin/bash", username])
 
 
@@ -223,6 +245,7 @@ def delete_user(username):
     """
     if err := _validate_username(username):
         return err
+
     return _sudo(["userdel", "--remove", username])
 
 
@@ -241,6 +264,7 @@ def set_user_password(username, password):
     chpasswd_cmd = (
         ["sudo", "--non-interactive", "chpasswd"] if os.geteuid() != 0 else ["chpasswd"]
     )
+
     try:
         proc = subprocess.run(
             chpasswd_cmd,
@@ -249,7 +273,9 @@ def set_user_password(username, password):
             text=True,
             timeout=15,
         )
+
         output = (proc.stdout + proc.stderr).strip()
+
         return output if output else "Password updated successfully."
     except subprocess.TimeoutExpired:
         return "Error: chpasswd timed out."
@@ -262,12 +288,16 @@ def list_groups():
     """List all groups on the system with their members."""
     raw = _run(["getent", "group"])
     lines = []
+
     for line in raw.splitlines():
         fields = line.split(":")
+
         if len(fields) >= 4:
             members = fields[3] if fields[3] else "(none)"
+
             lines.append(
                 f"  {fields[0]:<20} gid={fields[2]:<6} members={members}")
+
     return "Groups:\n" + "\n".join(lines) if lines else "No groups found."
 
 
@@ -284,6 +314,7 @@ def add_user_to_groups(username, groups):
         return err
 
     group_list = [g.strip() for g in groups.split(",") if g.strip()]
+
     if not group_list:
         return "Error: no groups provided."
     for group in group_list:
@@ -306,6 +337,7 @@ def remove_user_from_group(username, group):
         return err
     if err := _validate_group_name(group):
         return err
+
     return _sudo(["gpasswd", "--delete", username, group])
 
 
@@ -318,13 +350,16 @@ def list_services(state="active"):
         state: One of 'active', 'failed', or 'all'.
     """
     allowed_states = {"active", "failed", "all"}
+
     if state not in allowed_states:
         return f"Invalid state '{state}'. Choose from: {', '.join(sorted(allowed_states))}."
 
     cmd = ["systemctl", "list-units",
            "--type=service", "--no-pager", "--no-legend"]
+
     if state != "all":
         cmd += [f"--state={state}"]
+
     return _run(cmd)
 
 
@@ -339,13 +374,15 @@ def manage_service(service_name, action):
     """
     allowed_actions = {"disable", "enable",
                        "restart", "start", "status", "stop"}
+
     if action not in allowed_actions:
         return f"Invalid action '{action}'. Choose from: {', '.join(sorted(allowed_actions))}."
     if err := _validate_service_name(service_name):
         return err
 
     cmd = ["systemctl", action, service_name, "--no-pager"]
-    # 'status' is read-only; everything else modifies state and needs privilege.
+
+    # status -> read-only
     return _run(cmd) if action == "status" else _sudo(cmd)
 
 
@@ -364,7 +401,7 @@ def firewall_enable(enabled):
         enabled: True to enable ufw, False to disable it.
     """
     action = "enable" if enabled else "disable"
-    # ufw enable prompts for confirmation; --force suppresses it.
+
     return _sudo(["ufw", "--force", action])
 
 
@@ -380,6 +417,7 @@ def firewall_allow(port_or_service, proto="any", direction="in", comment=""):
         comment:         Optional free-text comment attached to the rule.
     """
     cmd = ["ufw"]
+
     if direction == "out":
         cmd += ["allow", "out"]
     else:
@@ -405,6 +443,7 @@ def firewall_deny(port_or_service, proto="any", direction="in"):
         direction:       'in' (default) or 'out'.
     """
     cmd = ["ufw"]
+
     if direction == "out":
         cmd += ["deny", "out"]
     else:
@@ -490,6 +529,7 @@ def build_agent():
 
     llm = ChatOllama(model=ollama_model,
                      base_url=ollama_url, temperature=0,)
+
     return create_agent(llm, TOOLS, system_prompt=SYSTEM_PROMPT)
 
 
@@ -498,11 +538,13 @@ def extract_last_ai_text(messages):
         if isinstance(msg, AIMessage):
             if isinstance(msg.content, str):
                 return msg.content
+
             texts = [
                 block["text"]
                 for block in msg.content
                 if isinstance(block, dict) and block.get("type") == "text"
             ]
+
             return "\n".join(texts)
     return "(no response)"
 
