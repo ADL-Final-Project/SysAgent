@@ -45,11 +45,7 @@ def _sudo(cmd, timeout=30):
 
 def _validate_username(username):
     if not re.fullmatch(r"[a-z_][a-z0-9_-]{0,31}", username):
-        return (
-            f"Invalid username '{username}'. "
-            "Must start with a lowercase letter or underscore, "
-            "contain only [a-z0-9_-], and be at most 32 characters."
-        )
+        return f"Invalid username '{username}'."
 
     return None
 
@@ -81,14 +77,15 @@ def _validate_package_name(pkg):
 @tool
 def check_system_info():
     """Return OS version, kernel, hostname, and uptime."""
-    return "\n".join([
-        "=== Kernel / OS ===",
-        _run(["uname", "-a"]),
-        "\n=== Hostname ===",
-        _run(["hostname", "--fqdn"]),
-        "\n=== Uptime ===",
-        _run(["uptime", "-p"]),
-    ])
+    return f'''
+        === Kernel / OS ===
+        {_run(["uname", "-a"])}
+
+        === Hostname ===
+        {_run(["hostname", "--fqdn"])}
+
+        === Uptime ===
+        {_run(["uptime", "-p"])}'''
 
 
 @tool
@@ -106,12 +103,12 @@ def check_memory():
 @tool
 def check_network():
     """Show network interfaces with their addresses and listening TCP/UDP sockets."""
-    return "\n".join([
-        "=== Interfaces ===",
-        _run(["ip", "-brief", "address"]),
-        "\n=== Listening sockets ===",
-        _run(["ss", "-tlnup"]),
-    ])
+    return f'''
+        === Interfaces ===
+        {_run(["ip", "-brief", "address"])}
+
+        === Listening sockets ===
+        {_run(["ss", "-tlnup"])}'''
 
 
 @tool
@@ -143,7 +140,7 @@ def show_logs(service, lines=50):
 
     Args:
         service: Name of the systemd service (e.g. 'nginx', 'ssh').
-        lines:   Number of log lines to return (default 50).
+        lines: Number of log lines to return (default 50).
     """
     if err := _validate_service_name(service):
         return err
@@ -173,7 +170,12 @@ def install_packages(packages):
         timeout=300,
     )
 
-    return f"--- apt-get update ---\n{update_out}\n\n--- apt-get install ---\n{install_out}"
+    return f'''
+    --- apt-get update ---
+    {update_out}
+    
+    --- apt-get install ---
+    {install_out}'''
 
 
 @tool
@@ -183,7 +185,7 @@ def remove_packages(packages, purge=False):
 
     Args:
         packages: Space-separated list of package names to remove.
-        purge:    If True, also delete configuration files (apt-get purge).
+        purge: If True, also delete configuration files (apt-get purge).
     """
     pkg_list = packages.split()
 
@@ -206,7 +208,12 @@ def update_packages():
     upgrade_out = _sudo(["apt-get", "upgrade", "-y",
                         "--with-new-pkgs"], timeout=600)
 
-    return f"--- apt-get update ---\n{update_out}\n\n--- apt-get upgrade ---\n{upgrade_out}"
+    return f'''
+    --- apt-get update ---
+    {update_out}
+    
+    --- apt-get upgrade ---
+    {upgrade_out}'''
 
 
 @tool
@@ -314,7 +321,7 @@ def add_user_to_groups(username, groups):
 
     Args:
         username: Login name of the target user.
-        groups:   Comma-separated list of group names (e.g. 'sudo,docker,www-data').
+        groups: Comma-separated list of group names (e.g. 'sudo,docker,www-data').
     """
     if err := _validate_username(username):
         return err
@@ -323,6 +330,7 @@ def add_user_to_groups(username, groups):
 
     if not group_list:
         return "Error: no groups provided."
+
     for group in group_list:
         if err := _validate_group_name(group):
             return err
@@ -337,7 +345,7 @@ def remove_user_from_group(username, group):
 
     Args:
         username: Login name of the target user.
-        group:    Name of the group to remove the user from.
+        group: Name of the group to remove the user from.
     """
     if err := _validate_username(username):
         return err
@@ -376,13 +384,14 @@ def manage_service(service_name, action):
 
     Args:
         service_name: Name of the service, e.g. 'nginx' or 'ssh'.
-        action:       One of 'start', 'stop', 'restart', 'status', 'enable', 'disable'.
+        action: One of 'start', 'stop', 'restart', 'status', 'enable', 'disable'.
     """
     allowed_actions = {"disable", "enable",
                        "restart", "start", "status", "stop"}
 
     if action not in allowed_actions:
         return f"Invalid action '{action}'. Choose from: {', '.join(sorted(allowed_actions))}."
+
     if err := _validate_service_name(service_name):
         return err
 
@@ -418,9 +427,9 @@ def firewall_allow(port_or_service, proto="any", direction="in", comment=""):
 
     Args:
         port_or_service: Port number, range (e.g. '8000:8080'), or service name (e.g. 'ssh').
-        proto:           Protocol — 'tcp', 'udp', or 'any' (default).
-        direction:       'in' (default) or 'out'.
-        comment:         Optional free-text comment attached to the rule.
+        proto: Protocol — 'tcp', 'udp', or 'any' (default).
+        direction: 'in' (default) or 'out'.
+        comment: Optional free-text comment attached to the rule.
     """
     cmd = ["ufw"]
 
@@ -445,8 +454,8 @@ def firewall_deny(port_or_service, proto="any", direction="in"):
 
     Args:
         port_or_service: Port number, range, or service name.
-        proto:           Protocol — 'tcp', 'udp', or 'any' (default).
-        direction:       'in' (default) or 'out'.
+        proto: Protocol — 'tcp', 'udp', or 'any' (default).
+        direction: 'in' (default) or 'out'.
     """
     cmd = ["ufw"]
 
@@ -523,14 +532,14 @@ SYSTEM_PROMPT = '''
 
 def build_agent():
     ollama_url = os.getenv("OLLAMA_BASE_URL")
-    ollama_model = os.getenv("OLLAMA_MODEL_NAME")
+    ollama_model = os.getenv("OLLAMA_LANG_MODEL")
     embed_model = os.getenv("OLLAMA_EMBED_MODEL")
     docs_path = os.getenv("DOCS_PATH")
 
     if not ollama_url:
         sys.exit("Error: OLLAMA_BASE_URL is not set.\n")
     if not ollama_model:
-        sys.exit("Error: OLLAMA_MODEL_NAME is not set.\n")
+        sys.exit("Error: OLLAMA_LANG_MODEL is not set.\n")
     if not embed_model:
         sys.exit("Error: OLLAMA_EMBED_MODEL is not set.\n")
     if not docs_path:
@@ -540,7 +549,8 @@ def build_agent():
 
     @tool
     def search_knowledge_base(query):
-        """Search the local documentation knowledge base for relevant information.
+        """
+        Search the local documentation knowledge base for relevant information.
         Use this when the user asks about procedures, runbooks, or anything
         that may be documented locally.
 
@@ -551,10 +561,13 @@ def build_agent():
 
         if not results:
             return "No relevant documents found in the knowledge base."
-        return "\n\n---\n\n".join(
+
+        retr = "\n\n---\n\n".join(
             f"[{doc.metadata.get('source', 'unknown')}]\n{doc.page_content}"
             for doc in results
         )
+
+        return retr
 
     llm = ChatOllama(model=ollama_model, base_url=ollama_url, temperature=0)
 
