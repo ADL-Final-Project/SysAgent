@@ -10,7 +10,7 @@ from langchain.tools import tool
 from langchain.agents import create_agent
 
 from langchain_community.document_loaders import DirectoryLoader, TextLoader, PyPDFLoader
-from langchain_community.document_loaders import UnstructuredMarkdownLoader
+# from langchain_community.document_loaders import UnstructuredMarkdownLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_ollama import OllamaEmbeddings
 from langchain_chroma import Chroma
