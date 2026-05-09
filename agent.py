@@ -478,6 +478,20 @@ def firewall_reset():
     return _sudo(["ufw", "--force", "reset"])
 
 
+@tool
+def read_man_page(command):
+    """
+    Read the man page for a command to look up usage, flags, and options.
+
+    Args:
+        command: The command to look up (e.g. 'rsync', 'iptables', 'systemctl').
+    """
+    if not re.fullmatch(r"[a-zA-Z0-9][a-zA-Z0-9_\-\.]*", command):
+        return f"Invalid command name '{command}'."
+
+    return _run(["man", command])
+
+
 ###########################
 
 
@@ -506,6 +520,7 @@ TOOLS = [
     firewall_deny,
     firewall_delete_rule,
     firewall_reset,
+    read_man_page,
 ]
 
 SYSTEM_PROMPT = '''
