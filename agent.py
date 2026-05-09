@@ -9,6 +9,12 @@ from langchain.messages import AIMessage, HumanMessage
 from langchain.tools import tool
 from langchain.agents import create_agent
 
+from langchain_community.document_loaders import DirectoryLoader, TextLoader, PyPDFLoader
+from langchain_community.document_loaders import UnstructuredMarkdownLoader
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langchain_ollama import OllamaEmbeddings
+from langchain_chroma import Chroma
+
 load_dotenv()
 
 
@@ -508,6 +514,7 @@ SYSTEM_PROMPT = '''
 
     Guidelines:
     - Always call the appropriate tool rather than guessing at system state.
+    - Before performing administration tasks, call search_knowledge_base to check for relevant runbooks, procedures, or documentation.
     - Report tool output clearly and concisely; highlight any errors or warnings.
     - For multi-step tasks, execute each step in sequence and summarise the outcome.
     - If a request is ambiguous or potentially destructive, ask the user to confirm before acting.
@@ -517,20 +524,75 @@ SYSTEM_PROMPT = '''
 def build_agent():
     ollama_url = os.getenv("OLLAMA_BASE_URL")
     ollama_model = os.getenv("OLLAMA_MODEL_NAME")
+    embed_model = os.getenv("OLLAMA_EMBED_MODEL")
+    docs_path = os.getenv("DOCS_PATH")
 
     if not ollama_url:
-        sys.exit(
-            "Error: OLLAMA_BASE_URL is not set.\n"
-        )
+        sys.exit("Error: OLLAMA_BASE_URL is not set.\n")
     if not ollama_model:
-        sys.exit(
-            "Error: OLLAMA_MODEL_NAME is not set.\n"
+        sys.exit("Error: OLLAMA_MODEL_NAME is not set.\n")
+    if not embed_model:
+        sys.exit("Error: OLLAMA_EMBED_MODEL is not set.\n")
+    if not docs_path:
+        sys.exit("Error: DOCS_PATH is not set.\n")
+
+    retriever = build_retriever(ollama_url, embed_model, docs_path)
+
+    @tool
+    def search_knowledge_base(query):
+        """Search the local documentation knowledge base for relevant information.
+        Use this when the user asks about procedures, runbooks, or anything
+        that may be documented locally.
+
+        Args:
+            query: A natural language description of what to look up.
+        """
+        results = retriever.invoke(query)
+
+        if not results:
+            return "No relevant documents found in the knowledge base."
+        return "\n\n---\n\n".join(
+            f"[{doc.metadata.get('source', 'unknown')}]\n{doc.page_content}"
+            for doc in results
         )
 
-    llm = ChatOllama(model=ollama_model,
-                     base_url=ollama_url, temperature=0,)
+    llm = ChatOllama(model=ollama_model, base_url=ollama_url, temperature=0)
 
-    return create_agent(llm, TOOLS, system_prompt=SYSTEM_PROMPT)
+    return create_agent(llm, [search_knowledge_base] + TOOLS, system_prompt=SYSTEM_PROMPT)
+
+
+def build_retriever(ollama_url, embed_model, docs_path):
+    if not os.path.isdir(docs_path):
+        sys.exit(
+            f"Error: DOCS_PATH '{docs_path}' does not exist or is not a directory.")
+
+    loaders = [
+        DirectoryLoader(docs_path, glob="**/*[!.pdf]",
+                        loader_cls=TextLoader, silent_errors=True),
+        # DirectoryLoader(docs_path, glob="**/*.md",
+        #                 loader_cls=UnstructuredMarkdownLoader, silent_errors=True),
+        DirectoryLoader(docs_path, glob="**/*.pdf",
+                        loader_cls=PyPDFLoader, silent_errors=True),
+    ]
+
+    docs = []
+
+    for loader in loaders:
+        docs.extend(loader.load())
+
+    if not docs:
+        print(
+            f"Warning: no documents found in '{docs_path}'.")
+
+    chunks = RecursiveCharacterTextSplitter(
+        chunk_size=1000, chunk_overlap=150
+    ).split_documents(docs)
+
+    embeddings = OllamaEmbeddings(model=embed_model, base_url=ollama_url)
+
+    vectorstore = Chroma.from_documents(chunks, embeddings)
+
+    return vectorstore.as_retriever(search_kwargs={"k": 4})
 
 
 def extract_last_ai_text(messages):

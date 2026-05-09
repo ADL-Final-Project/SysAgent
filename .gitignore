@@ -94,3 +94,4 @@ temp/
 *.pid
 *.seed
 *.pid.lock
+rag_docs/**
