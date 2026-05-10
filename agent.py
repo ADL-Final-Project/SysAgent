@@ -575,12 +575,14 @@ def build_agent():
 
 
 def build_retriever(ollama_url, embed_model, docs_path):
+    print("Processing documents for retrieval...\n")
+
     if not os.path.isdir(docs_path):
         sys.exit(
             f"Error: DOCS_PATH '{docs_path}' does not exist or is not a directory.")
 
     loaders = [
-        DirectoryLoader(docs_path, glob="**/*[!.pdf]",
+        DirectoryLoader(docs_path, glob="**/*.txt",
                         loader_cls=TextLoader, silent_errors=True),
         # DirectoryLoader(docs_path, glob="**/*.md",
         #                 loader_cls=UnstructuredMarkdownLoader, silent_errors=True),
